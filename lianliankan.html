@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>连连看</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5efe3;
+      --ink: #1d2527;
+      --muted: #6a7376;
+      --panel: #fffaf1;
+      --panel-2: #f8eddc;
+      --line: #d6c6ad;
+      --line-strong: #b9a280;
+      --red: #ba3232;
+      --green: #177f68;
+      --gold: #d69a25;
+      --blue: #2f6fa6;
+      --tile: #fffdf7;
+      --tile-disabled: #eadfcf;
+      --shadow: 0 18px 55px rgba(50, 39, 24, .16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 18px;
+      background:
+        linear-gradient(135deg, rgba(186, 50, 50, .08), transparent 34%),
+        linear-gradient(315deg, rgba(23, 127, 104, .10), transparent 38%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+
+    button,
+    a {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, 100%);
+      min-height: calc(100vh - 36px);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 290px;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .board-panel,
+    .side {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 250, 241, .94);
+      box-shadow: var(--shadow);
+    }
+
+    .board-panel {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .topbar {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .home {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fffdf7;
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .stage {
+      position: relative;
+      min-width: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(120, 94, 54, .08) 1px, transparent 1px),
+        linear-gradient(rgba(120, 94, 54, .08) 1px, transparent 1px),
+        #f1e3cd;
+      background-size: 28px 28px;
+      padding: 12px;
+    }
+
+    .board {
+      position: relative;
+      width: min(100%, calc((100vh - 150px) * 1.25));
+      max-width: 820px;
+      aspect-ratio: 10 / 8;
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: clamp(4px, .75vw, 8px);
+      touch-action: manipulation;
+    }
+
+    .tile {
+      position: relative;
+      min-width: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      border: 1px solid #c8b89e;
+      border-radius: 8px;
+      background: var(--tile);
+      color: var(--ink);
+      box-shadow: inset 0 -4px 0 rgba(42, 31, 18, .08), 0 3px 8px rgba(42, 31, 18, .08);
+      cursor: pointer;
+      user-select: none;
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease, opacity .12s ease;
+    }
+
+    .tile:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+    }
+
+    .tile.empty {
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .tile.selected {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(214, 154, 37, .28), inset 0 -4px 0 rgba(42, 31, 18, .08);
+      transform: translateY(-2px);
+    }
+
+    .tile.hint {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(23, 127, 104, .22), inset 0 -4px 0 rgba(42, 31, 18, .08);
+    }
+
+    .tile.wrong {
+      border-color: var(--red);
+      animation: shake .22s linear;
+    }
+
+    .tile.matched {
+      transform: scale(.82);
+      opacity: 0;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 74%;
+      aspect-ratio: 1;
+      border: 2px solid currentColor;
+      border-radius: 7px;
+      font-size: clamp(18px, 3.5vw, 34px);
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(180deg, #fff, #fff8eb);
+    }
+
+    .suit-red {
+      color: var(--red);
+    }
+
+    .suit-green {
+      color: var(--green);
+    }
+
+    .suit-blue {
+      color: var(--blue);
+    }
+
+    .suit-gold {
+      color: #9b6d12;
+    }
+
+    .path-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 4;
+    }
+
+    .side {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .stat {
+      min-height: 76px;
+      padding: 12px;
+      display: grid;
+      align-content: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .value {
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf7;
+      color: var(--ink);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+      background: #fff8e9;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      color: #9b9b9b;
+      background: var(--tile-disabled);
+    }
+
+    .primary {
+      border-color: #a47b1e;
+      background: linear-gradient(180deg, #edc96f, var(--gold));
+      color: #241707;
+    }
+
+    .status {
+      min-height: 44px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf7;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .rules {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(36, 29, 20, .42);
+      backdrop-filter: blur(3px);
+      z-index: 10;
+    }
+
+    .overlay.show {
+      display: grid;
+    }
+
+    .dialog {
+      width: min(380px, 100%);
+      display: grid;
+      gap: 14px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .dialog h2 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+
+    .dialog p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 12px;
+      }
+
+      .app {
+        min-height: calc(100vh - 24px);
+        grid-template-columns: 1fr;
+      }
+
+      .board-panel {
+        min-height: auto;
+      }
+
+      .stage {
+        min-height: auto;
+      }
+
+      .board {
+        width: 100%;
+      }
+
+      .side {
+        gap: 12px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .board-panel,
+      .side {
+        padding: 10px;
+      }
+
+      .topbar {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .home {
+        width: 100%;
+      }
+
+      .stage {
+        padding: 8px;
+      }
+
+      .board {
+        gap: 3px;
+      }
+
+      .mark {
+        width: 82%;
+        border-width: 1px;
+        font-size: clamp(13px, 5.2vw, 22px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="board-panel">
+      <div class="topbar">
+        <h1>连连看</h1>
+        <a class="home" href="index.html">返回合集</a>
+      </div>
+
+      <div class="stage">
+        <div class="board" id="board" aria-label="连连看棋盘"></div>
+        <svg class="path-layer" id="pathLayer" aria-hidden="true"></svg>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="stats">
+        <div class="stat">
+          <div class="label">时间</div>
+          <div class="value" id="time">04:00</div>
+        </div>
+        <div class="stat">
+          <div class="label">分数</div>
+          <div class="value" id="score">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">剩余</div>
+          <div class="value" id="remaining">80</div>
+        </div>
+        <div class="stat">
+          <div class="label">可消</div>
+          <div class="value" id="matches">0</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="startBtn">开始 / 重新开始</button>
+        <div class="row">
+          <button id="pauseBtn">暂停</button>
+          <button id="hintBtn">提示 3</button>
+        </div>
+        <button id="shuffleBtn">洗牌 3</button>
+      </div>
+
+      <div class="status" id="status">点击开始进入游戏。</div>
+      <p class="rules">选择两张相同牌。如果它们之间的路线最多转弯两次，并且没有其它牌阻挡，就会被消除。</p>
+    </aside>
+  </main>
+
+  <div class="overlay" id="overlay">
+    <div class="dialog">
+      <h2 id="overlayTitle">游戏结束</h2>
+      <p id="overlayText">本局得分 0</p>
+      <button class="primary" id="againBtn">再来一局</button>
+    </div>
+  </div>
+
+  <script>
+    const rows = 8;
+    const cols = 10;
+    const totalSeconds = 240;
+    const tileTypes = [
+      { text: "一", suit: "suit-red" },
+      { text: "二", suit: "suit-red" },
+      { text: "三", suit: "suit-red" },
+      { text: "四", suit: "suit-red" },
+      { text: "五", suit: "suit-red" },
+      { text: "六", suit: "suit-red" },
+      { text: "七", suit: "suit-red" },
+      { text: "八", suit: "suit-red" },
+      { text: "九", suit: "suit-red" },
+      { text: "萬", suit: "suit-red" },
+      { text: "東", suit: "suit-blue" },
+      { text: "南", suit: "suit-blue" },
+      { text: "西", suit: "suit-blue" },
+      { text: "北", suit: "suit-blue" },
+      { text: "中", suit: "suit-red" },
+      { text: "發", suit: "suit-green" },
+      { text: "白", suit: "suit-gold" },
+      { text: "竹", suit: "suit-green" },
+      { text: "筒", suit: "suit-blue" },
+      { text: "条", suit: "suit-green" }
+    ];
+
+    const boardEl = document.querySelector("#board");
+    const pathLayer = document.querySelector("#pathLayer");
+    const timeEl = document.querySelector("#time");
+    const scoreEl = document.querySelector("#score");
+    const remainingEl = document.querySelector("#remaining");
+    const matchesEl = document.querySelector("#matches");
+    const statusEl = document.querySelector("#status");
+    const startBtn = document.querySelector("#startBtn");
+    const pauseBtn = document.querySelector("#pauseBtn");
+    const hintBtn = document.querySelector("#hintBtn");
+    const shuffleBtn = document.querySelector("#shuffleBtn");
+    const overlay = document.querySelector("#overlay");
+    const overlayTitle = document.querySelector("#overlayTitle");
+    const overlayText = document.querySelector("#overlayText");
+    const againBtn = document.querySelector("#againBtn");
+
+    let grid = [];
+    let selected = null;
+    let score = 0;
+    let timeLeft = totalSeconds;
+    let hintsLeft = 3;
+    let shufflesLeft = 3;
+    let running = false;
+    let paused = false;
+    let timer = null;
+    let messageTimer = null;
+
+    renderEmptyBoard();
+    updatePanel();
+
+    function startGame() {
+      clearInterval(timer);
+      clearTransientClasses();
+      overlay.classList.remove("show");
+      selected = null;
+      score = 0;
+      timeLeft = totalSeconds;
+      hintsLeft = 3;
+      shufflesLeft = 3;
+      running = true;
+      paused = false;
+      grid = makeSolvableGrid();
+      renderBoard();
+      updatePanel();
+      setStatus("游戏开始。");
+      timer = setInterval(tick, 1000);
+    }
+
+    function renderEmptyBoard() {
+      boardEl.innerHTML = "";
+      for (let i = 0; i < rows * cols; i++) {
+        const tile = document.createElement("button");
+        tile.className = "tile empty";
+        tile.type = "button";
+        tile.tabIndex = -1;
+        boardEl.appendChild(tile);
+      }
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      for (let row = 1; row <= rows; row++) {
+        for (let col = 1; col <= cols; col++) {
+          const cell = grid[row][col];
+          const tile = document.createElement("button");
+          tile.type = "button";
+          tile.className = "tile";
+          tile.dataset.row = row;
+          tile.dataset.col = col;
+
+          if (!cell) {
+            tile.classList.add("empty");
+            tile.tabIndex = -1;
+          } else {
+            tile.setAttribute("aria-label", `${cell.text} 牌`);
+            tile.innerHTML = `<span class="mark ${cell.suit}">${cell.text}</span>`;
+            tile.addEventListener("click", () => chooseTile(row, col));
+          }
+
+          boardEl.appendChild(tile);
+        }
+      }
+    }
+
+    function makeSolvableGrid() {
+      let nextGrid;
+      let guard = 0;
+      do {
+        nextGrid = makeGrid();
+        guard++;
+      } while (!findAvailablePair(nextGrid) && guard < 20);
+      return nextGrid;
+    }
+
+    function makeGrid() {
+      const inner = Array.from({ length: rows + 2 }, () => Array(cols + 2).fill(null));
+      const pairsNeeded = (rows * cols) / 2;
+      const deck = [];
+
+      for (let i = 0; i < pairsNeeded; i++) {
+        const type = tileTypes[i % tileTypes.length];
+        deck.push({ ...type, id: i % tileTypes.length });
+        deck.push({ ...type, id: i % tileTypes.length });
+      }
+
+      shuffleArray(deck);
+
+      for (let row = 1; row <= rows; row++) {
+        for (let col = 1; col <= cols; col++) {
+          inner[row][col] = deck.pop();
+        }
+      }
+
+      return inner;
+    }
+
+    function chooseTile(row, col) {
+      if (!running || paused || !grid[row][col]) return;
+      clearLine();
+      clearTransientClasses();
+
+      const current = { row, col };
+      if (selected && selected.row === row && selected.col === col) {
+        selected = null;
+        setStatus("已取消选择。");
+        updateSelection();
+        return;
+      }
+
+      if (!selected) {
+        selected = current;
+        setStatus("再选择一张相同的牌。");
+        updateSelection();
+        return;
+      }
+
+      const first = selected;
+      const path = canConnect(first, current, grid);
+      const sameType = grid[first.row][first.col]?.id === grid[row][col]?.id;
+
+      if (sameType && path) {
+        removePair(first, current, path);
+      } else {
+        markWrong(first, current);
+        selected = current;
+        setStatus(sameType ? "路线被挡住了，最多只能转弯两次。" : "两张牌不相同。");
+        updateSelection();
+      }
+    }
+
+    function removePair(first, second, path) {
+      showPath(path);
+      markMatched(first, second);
+      grid[first.row][first.col] = null;
+      grid[second.row][second.col] = null;
+      selected = null;
+      score += 20 + Math.max(0, Math.floor(timeLeft / 30));
+      setStatus("消除成功。");
+      setTimeout(() => {
+        renderBoard();
+        clearLine();
+        afterMove();
+      }, 180);
+    }
+
+    function afterMove() {
+      const remaining = countRemaining();
+      if (remaining === 0) {
+        endGame(true);
+        return;
+      }
+
+      const pair = findAvailablePair(grid);
+      if (!pair) {
+        setStatus("当前没有可消除对子，已自动洗牌。");
+        shuffleRemaining(true);
+      }
+
+      updatePanel();
+    }
+
+    function tick() {
+      if (!running || paused) return;
+      timeLeft--;
+      updatePanel();
+
+      if (timeLeft <= 0) {
+        endGame(false);
+      }
+    }
+
+    function togglePause() {
+      if (!running) return;
+      paused = !paused;
+      pauseBtn.textContent = paused ? "继续" : "暂停";
+      setStatus(paused ? "游戏已暂停。" : "继续游戏。");
+      clearLine();
+      clearTransientClasses();
+      updatePanel();
+    }
+
+    function useHint() {
+      if (!running || paused || hintsLeft <= 0) return;
+      clearLine();
+      clearTransientClasses();
+      const pair = findAvailablePair(grid);
+      if (!pair) {
+        setStatus("当前没有可提示的对子，请洗牌。");
+        return;
+      }
+
+      hintsLeft--;
+      selected = null;
+      markHint(pair[0], pair[1]);
+      setStatus("已标出一组可消除对子。");
+      updatePanel();
+    }
+
+    function shuffleRemaining(auto = false) {
+      if (!running || paused || countRemaining() < 2) return;
+      if (!auto) {
+        if (shufflesLeft <= 0) return;
+        shufflesLeft--;
+      }
+
+      selected = null;
+      clearLine();
+      clearTransientClasses();
+
+      let guard = 0;
+      do {
+        shuffleGridValues();
+        guard++;
+      } while (!findAvailablePair(grid) && guard < 30);
+
+      renderBoard();
+      setStatus(auto ? "已自动洗牌。" : "洗牌完成。");
+      updatePanel();
+    }
+
+    function shuffleGridValues() {
+      const values = [];
+      forEachCell((row, col) => {
+        if (grid[row][col]) values.push(grid[row][col]);
+      });
+      shuffleArray(values);
+      forEachCell((row, col) => {
+        if (grid[row][col]) grid[row][col] = values.pop();
+      });
+    }
+
+    function endGame(won) {
+      running = false;
+      paused = false;
+      clearInterval(timer);
+      clearLine();
+      clearTransientClasses();
+      pauseBtn.textContent = "暂停";
+      updatePanel();
+      overlayTitle.textContent = won ? "通关成功" : "时间到";
+      overlayText.textContent = `本局得分 ${score}，剩余 ${countRemaining()} 张牌。`;
+      overlay.classList.add("show");
+      setStatus(won ? "全部消除完成。" : "时间归零，游戏结束。");
+    }
+
+    function canConnect(a, b, sourceGrid) {
+      if (!sourceGrid[a.row][a.col] || !sourceGrid[b.row][b.col]) return null;
+      if (sourceGrid[a.row][a.col].id !== sourceGrid[b.row][b.col].id) return null;
+
+      const queue = [{ row: a.row, col: a.col, dir: -1, turns: 0, path: [a] }];
+      const seen = new Map();
+      const dirs = [
+        { row: -1, col: 0 },
+        { row: 1, col: 0 },
+        { row: 0, col: -1 },
+        { row: 0, col: 1 }
+      ];
+
+      while (queue.length) {
+        const state = queue.shift();
+        for (let dir = 0; dir < dirs.length; dir++) {
+          const next = {
+            row: state.row + dirs[dir].row,
+            col: state.col + dirs[dir].col
+          };
+          const turns = state.dir === -1 || state.dir === dir ? state.turns : state.turns + 1;
+          if (turns > 2 || !insideFrame(next)) continue;
+          if (!isPassable(next, b, sourceGrid)) continue;
+
+          const key = `${next.row},${next.col},${dir}`;
+          if (seen.has(key) && seen.get(key) <= turns) continue;
+          seen.set(key, turns);
+
+          const path = appendPoint(state.path, next, dir, state.dir);
+          if (next.row === b.row && next.col === b.col) {
+            return path;
+          }
+
+          queue.push({ row: next.row, col: next.col, dir, turns, path });
+        }
+      }
+
+      return null;
+    }
+
+    function appendPoint(path, next, dir, previousDir) {
+      if (previousDir === -1) {
+        return [path[0], next];
+      }
+      if (previousDir === dir) {
+        return [...path.slice(0, -1), next];
+      }
+      return [...path, next];
+    }
+
+    function insideFrame(point) {
+      return point.row >= 0 && point.row <= rows + 1 && point.col >= 0 && point.col <= cols + 1;
+    }
+
+    function isPassable(point, target, sourceGrid) {
+      if (point.row === target.row && point.col === target.col) return true;
+      return !sourceGrid[point.row][point.col];
+    }
+
+    function findAvailablePair(sourceGrid) {
+      const cells = [];
+      forEachCell((row, col) => {
+        if (sourceGrid[row][col]) cells.push({ row, col });
+      });
+
+      for (let i = 0; i < cells.length; i++) {
+        for (let j = i + 1; j < cells.length; j++) {
+          const a = cells[i];
+          const b = cells[j];
+          if (sourceGrid[a.row][a.col].id === sourceGrid[b.row][b.col].id && canConnect(a, b, sourceGrid)) {
+            return [a, b];
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function updateSelection() {
+      document.querySelectorAll(".tile.selected").forEach(tile => tile.classList.remove("selected"));
+      if (!selected) return;
+      getTileEl(selected)?.classList.add("selected");
+    }
+
+    function markWrong(first, second) {
+      getTileEl(first)?.classList.add("wrong");
+      getTileEl(second)?.classList.add("wrong");
+    }
+
+    function markHint(first, second) {
+      getTileEl(first)?.classList.add("hint");
+      getTileEl(second)?.classList.add("hint");
+    }
+
+    function markMatched(first, second) {
+      getTileEl(first)?.classList.add("matched");
+      getTileEl(second)?.classList.add("matched");
+    }
+
+    function clearTransientClasses() {
+      document.querySelectorAll(".tile.selected, .tile.hint, .tile.wrong").forEach(tile => {
+        tile.classList.remove("selected", "hint", "wrong");
+      });
+    }
+
+    function showPath(path) {
+      const points = path.map(pointToBoardCoords);
+      const d = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+      pathLayer.innerHTML = `<path d="${d}" fill="none" stroke="#d69a25" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>`;
+    }
+
+    function clearLine() {
+      pathLayer.innerHTML = "";
+    }
+
+    function pointToBoardCoords(point) {
+      const rect = boardEl.getBoundingClientRect();
+      const layerRect = pathLayer.getBoundingClientRect();
+      const cellW = rect.width / cols;
+      const cellH = rect.height / rows;
+      const edgeGap = Math.min(cellW, cellH) * .45;
+      let x = (point.col - .5) * cellW;
+      let y = (point.row - .5) * cellH;
+
+      if (point.col === 0) x = -edgeGap;
+      if (point.col === cols + 1) x = rect.width + edgeGap;
+      if (point.row === 0) y = -edgeGap;
+      if (point.row === rows + 1) y = rect.height + edgeGap;
+
+      return {
+        x: x + rect.left - layerRect.left,
+        y: y + rect.top - layerRect.top
+      };
+    }
+
+    function getTileEl(point) {
+      return boardEl.querySelector(`[data-row="${point.row}"][data-col="${point.col}"]`);
+    }
+
+    function updatePanel() {
+      timeEl.textContent = formatTime(timeLeft);
+      scoreEl.textContent = score;
+      remainingEl.textContent = countRemaining();
+      matchesEl.textContent = running ? countAvailablePairs() : 0;
+      hintBtn.textContent = `提示 ${hintsLeft}`;
+      shuffleBtn.textContent = `洗牌 ${shufflesLeft}`;
+      pauseBtn.disabled = !running;
+      hintBtn.disabled = !running || paused || hintsLeft <= 0;
+      shuffleBtn.disabled = !running || paused || shufflesLeft <= 0;
+    }
+
+    function countAvailablePairs() {
+      const cells = [];
+      let count = 0;
+      forEachCell((row, col) => {
+        if (grid[row]?.[col]) cells.push({ row, col });
+      });
+
+      for (let i = 0; i < cells.length; i++) {
+        for (let j = i + 1; j < cells.length; j++) {
+          const a = cells[i];
+          const b = cells[j];
+          if (grid[a.row][a.col].id === grid[b.row][b.col].id && canConnect(a, b, grid)) {
+            count++;
+          }
+        }
+      }
+
+      return count;
+    }
+
+    function countRemaining() {
+      let count = 0;
+      forEachCell((row, col) => {
+        if (grid[row]?.[col]) count++;
+      });
+      return count;
+    }
+
+    function forEachCell(callback) {
+      for (let row = 1; row <= rows; row++) {
+        for (let col = 1; col <= cols; col++) {
+          callback(row, col);
+        }
+      }
+    }
+
+    function setStatus(message) {
+      clearTimeout(messageTimer);
+      statusEl.textContent = message;
+      messageTimer = setTimeout(() => {
+        if (running && !paused) statusEl.textContent = "寻找相同牌并连线消除。";
+      }, 2200);
+    }
+
+    function formatTime(seconds) {
+      const min = Math.floor(Math.max(0, seconds) / 60).toString().padStart(2, "0");
+      const sec = (Math.max(0, seconds) % 60).toString().padStart(2, "0");
+      return `${min}:${sec}`;
+    }
+
+    function shuffleArray(items) {
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      return items;
+    }
+
+    startBtn.addEventListener("click", startGame);
+    againBtn.addEventListener("click", startGame);
+    pauseBtn.addEventListener("click", togglePause);
+    hintBtn.addEventListener("click", useHint);
+    shuffleBtn.addEventListener("click", () => shuffleRemaining(false));
+
+    window.addEventListener("keydown", event => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        togglePause();
+      }
+
+      if (event.key.toLowerCase() === "h") {
+        useHint();
+      }
+    });
+  </script>
+</body>
+</html>
